@@ -1,3 +1,4 @@
+create view main_deck as
 select 
   date,
   country,
@@ -12,6 +13,32 @@ select
     else 0 end as period
 from covid19_basic_differences cbd;
 
+create view testing as
+select 
+   date,
+   country,
+   tests_performed
+from covid19_tests ct;
+
+create view covid_info as
+select 
+  cbd.date,
+  cbd.country,
+  cbd.confirmed,
+  case when weekday(cbd.date) in (5,6) then 1 else 0 end as weekend,
+  case 
+    when cbd.date < '2020-03-20' then 3
+    when cbd.date >= '2020-03-20' then 0
+    when cbd.date >= '2020-06-21' then 1
+    when cbd.date >= '2020-09-22' then 2
+    when cbd.date >= '2020-12-21' then 3
+    else 0 end as period,
+  ct.tests_performed
+from covid19_basic_differences cbd
+join covid19_tests ct on
+cbd.date=ct.`date`
+and cbd.country=ct.country;
+
 select 
    country,
    population_density,
@@ -25,15 +52,6 @@ select
    mortaliy_under5 as child_mortality
 from economies e 
 where year=2020;
-
-select 
-   r.year,
-   r.country,
-   r.religion,
-   round (r.population/c.population *100,3) as religion_pop_share 
-from religions r, countries c 
-where r.country=c.country 
-and r.year=2020;
 
 create table t_country_rel_share
 SELECT r.country , r.religion , 
@@ -89,20 +107,6 @@ create view v_religions_pivot_final as
    coalesce (Unaffiliated_Religions, 0) as Unaffiliated_Religions
 from v_religions_pivot vrp
 group by country);
-   
-   
-     SELECT a.country, round (a.Christianity, 2) as christianity , round (b.Islam, 2) as Islam 
-FROM (
-    SELECT tcrs.country , tcrs.religion_share_2020 as christianity
-    FROM t_country_rel_share tcrs 
-    WHERE religion = 'Christianity'
-    ) a JOIN (
-    SELECT tcrs.country , tcrs.religion_share_2020 as islam
-    FROM t_country_rel_share tcrs 
-    WHERE religion = 'Islam'
-    ) b
-    ON a.country = b.country
-;
     
     SELECT a.country, round (a.life_exp_1965, 2) as life_exp_1965 , round (b.life_exp_2015, 2) as life_exp_2015,
     round( b.life_exp_2015 - a.life_exp_1965, 2 ) as life_exp_diff
@@ -189,37 +193,8 @@ select `date`, city, sum (hours_rain)
        where city is not null
        group by date,city;
             
-select 
-    w.date,
-    c.country,
-    w.city,
-    sum (w2.hours_rain)
-    from weather w 
-join countries c 
- on w.city=c.capital_city 
-join (select `date`, city, case when rain != '0.0 mm' then 3 else 0 end as hours_rain 
-       from weather w
-       where city is not null
-       group by date,city,time) w2
-       on w2.city=c.capital_city
-       and w2.date=w.`date` 
- group by w2.`date` 
- order by w2.`date`; 
 
-SELECT c.country, c.date, c.confirmed , lt.iso3 , c2.capital_city , w.max_temp
-FROM covid19_basic as c
-JOIN lookup_table lt 
-    on c.country = lt.country 
-    and c.country = 'Czechia'
-    and month(c.date) = 10
-JOIN countries c2
-    on lt.iso3 = c2.iso3
-JOIN (  SELECT w.city , w.date , max(w.temp) as max_temp
-        FROM weather w 
-        GROUP BY w.city, w.date) w
-    on c2.capital_city = w.city 
-    and c.date = w.date
-ORDER BY c.date desc
-;
+
+
 
 
