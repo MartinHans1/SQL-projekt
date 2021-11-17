@@ -1,4 +1,5 @@
-create view main_deck as
+--- parciální splnìní úkolù ---
+
 select 
   date,
   country,
@@ -13,6 +14,12 @@ select
     else 0 end as period
 from covid19_basic_differences cbd;
 
+select 
+   country,
+   population_density,
+   median_age_2018
+from countries c;
+
 create view testing as
 select 
    date,
@@ -20,7 +27,17 @@ select
    tests_performed
 from covid19_tests ct;
 
-create view covid_info as
+
+
+---- final script
+
+select 
+   country,
+   population_density,
+   median_age_2018
+from countries c;
+
+create table covid19_info as
 select 
   cbd.date,
   cbd.country,
@@ -33,27 +50,40 @@ select
     when cbd.date >= '2020-09-22' then 2
     when cbd.date >= '2020-12-21' then 3
     else 0 end as period,
-  ct.tests_performed
+  ct.tests_performed,
+  round(c.population_density,2),
+  c.median_age_2018
 from covid19_basic_differences cbd
 join covid19_tests ct on
 cbd.date=ct.`date`
-and cbd.country=ct.country;
+and cbd.country=ct.country
+join countries c on cbd.country=c.country;
 
+create table covid19_economies as
 select 
-   country,
-   population_density,
-   median_age_2018
-from countries c;
+   e.country,
+   round (a.GDP/a.population, 2) as gdp_per_capita,
+   round (avg(e.gini), 2) as gini_coeficient,
+   round (avg(e.mortaliy_under5), 2) as child_mortality
+from economies e
+join (
+select country, GDP, population 
+from economies e2
+where year=2020 group by country) a on a.country=e.country
+group by e.country;
 
-select 
-   country,
-   round (GDP/population, 2) as gdp_per_capita,
-   gini as gini_coeficient,
-   mortaliy_under5 as child_mortality
-from economies e 
-where year=2020;
 
-create table t_country_rel_share
+select ci.country,ci.date, ci.median_age_2018, ce.gdp_per_capita
+from covid19_info ci
+join covid19_economies ce 
+on ci.country=ce.country
+join covid19_religions_pivot_final crpf 
+on crpf.country=ci.country
+join covid19_life_expectancy cle
+on ci.country=cle.country
+ ;
+
+create table covid19_religion_rel_share
 SELECT r.country , r.religion , 
     round( r.population / r2.total_population_2020 * 100, 2 ) as religion_share_2020
 FROM religions r 
@@ -67,7 +97,7 @@ JOIN (
     AND r.year = r2.year
     AND r.population > 0;
  
-create view v_religions as   
+create table covid19_religions_pivot as   
  (select
     country,
     case when religion = "Buddhism" then religion_share_2020 end as Buddhism,
@@ -78,9 +108,9 @@ create view v_religions as
     case when religion = "Judaism" then religion_share_2020 end as Judaism,
     case when religion = "Other Religions" then religion_share_2020 end as Other_Religions,
     case when religion = "Unaffiliated Religions" then religion_share_2020 end as Unaffiliated_Religions
- from t_country_rel_share tcrs);
+ from covid19_country_rel_share);
 
-create view v_religions_pivot as
+create table covid19_religions_pivot2 as
 (select 
   country,
   sum(Buddhism) as Buddhism,
@@ -91,10 +121,10 @@ create view v_religions_pivot as
   sum(Judaism) as Judaism,
   sum(Other_Religions) as Other_Religions,
   sum(Unaffiliated_Religions) as Unaffiliated_Religions 
-from v_religions vr
+from covid19_religions
 group by country);
 
-create view v_religions_pivot_final as
+create table covid19_religions_pivot_final as
    (select
    country,
    coalesce (Buddhism, 0) as Buddhism,
@@ -108,7 +138,8 @@ create view v_religions_pivot_final as
 from v_religions_pivot vrp
 group by country);
     
-    SELECT a.country, round (a.life_exp_1965, 2) as life_exp_1965 , round (b.life_exp_2015, 2) as life_exp_2015,
+create table covid19_life_expectancy as
+SELECT a.country,
     round( b.life_exp_2015 - a.life_exp_1965, 2 ) as life_exp_diff
 FROM (
     SELECT le.country , le.life_expectancy as life_exp_1965
@@ -122,6 +153,7 @@ FROM (
     ON a.country = b.country
 ;
 
+create table covid19_temperature as
 select 
 	w.date,
 	c.country,
@@ -139,6 +171,38 @@ join (select `date`, city, round (avg(temp),2) as avg_temp
 group by w.date	  
 order by w.`date`;
 
+create view covid19_weather as
+select 
+	w.date,
+	c.country,
+	w.city,
+	w2.avg_temp,
+	sum (w3.hours_rain) as hours_rain,
+	w4.max_wind
+from weather w 
+join countries c 
+on w.city=c.capital_city
+join (select `date`, city, round (avg(temp),2) as avg_temp
+	  from weather w
+	  where time between '09:00' and '18:00'
+	  group by date, city) w2
+	  on w2.city=w.city 
+	  and w2.date=w.`date`
+join (select `date`, city, case when rain != '0.0 mm' then 3 else 0 end as hours_rain 
+       from weather w
+       where city is not null
+       group by date,city,time) w3
+       on c.capital_city=w3.city
+       and w.date=w3.date
+join (select `date`, city, round (max(wind),2) as max_wind
+	  from weather w 
+	  group by date, city) w4
+	  on w4.city=w.city 
+	  and w4.date=w.`date` 
+group by w.date, c.country	  
+order by w.`date`;
+
+create table covid19_rain
 select 
     w.date,
     c.country,
@@ -156,6 +220,7 @@ join (select `date`, city, case when rain != '0.0 mm' then 3 else 0 end as hours
  group by w2.`date` 
  order by w2.`date`; 
 
+create view covid19_wind as
 select 
 	w.date,
 	c.country,
@@ -194,7 +259,81 @@ select `date`, city, sum (hours_rain)
        group by date,city;
             
 
+create table weather_converted as
+select 
+w.city,
+w.date,
+max(w2.wind) as max_wind,
+avg(w2.temp) as avg_temp
+from weather w
+join (select
+city,
+date,
+cast(wind as integer) as wind,
+cast(temp as integer) as temp 
+from weather w2) w2
+on w.date=w2.date
+and w2.city=w.city
+where w.city is not null
+group by city,date;
+
+select wind
+from weather w 
+order by convert (substring(wind, 7), signed integer);
+
+select cast(wind as integer) from weather w;
+
+-- pøevodníkové selecty texty na èísla --
+
+create table covid19_temperature_convert as
+select
+  w.city,
+  w.date,
+  w.time,
+  cast(w2.temp as integer) as temp_number 
+from weather w
+join (select 
+  date, 
+  city, 
+  replace (temp,'°c',' ') as temp
+from weather) w2
+on w.city=w2.city 
+and w.date=w2.date
+where w.city is not null 
+group by w.city,w.date;
+
+select
+  w.city,
+  w.date,
+  cast(w2.wind as integer) as wind_number 
+from weather w
+join (select 
+  date,
+  city,
+  substring (wind,1,2) as wind
+from weather w) w2
+on w.city=w2.city 
+and w.date=w2.date
+where w.city is not null 
+group by w.city,w.date;
 
 
+select 
+  date, 
+  city, 
+  replace (temp,'°c',' ') as temp
+from weather
+where city is not null;
 
+select 
+ date,
+ city,
+ substring (wind,1,2) as wind
+from weather w;
+
+select 
+  date, 
+  city, 
+  replace (wind,'km/h from%',' ') as wind
+from weather;
 
