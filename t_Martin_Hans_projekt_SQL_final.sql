@@ -71,13 +71,14 @@ select
     when cbd.date >= '2020-12-21' then 3
     else 0 end as period,
   ct.tests_performed,
-  round(c.population_density,2),
+  round(c.population_density,2) as population_density,
   c.median_age_2018
 from covid19_basic_differences cbd
 join covid19_tests ct on
 cbd.date=ct.`date`
 and cbd.country=ct.country
-join countries c on cbd.country=c.country;
+join countries c on cbd.country=c.country
+order by date, country;
 
 create table covid19_economies as
 select 
@@ -161,44 +162,8 @@ FROM (
     ) b
     ON a.country = b.country
 ;
-     
-select 
-ci.country,
-ci.date, 
-ci.median_age_2018, 
-ce.gdp_per_capita,
-ce.gini_coeficient,
-ce.child_mortality,
-cle.life_exp_diff,
-crpf.Buddhism,
-crpf.Christianity,
-crpf.Folk_Religions,
-crpf.Hinduism,
-crpf.Islam,
-crpf.Judaism,
-crpf.Other_Religions,
-crpf.Unaffiliated_Religions
-from covid19_info ci
-join covid19_economies ce 
-on ci.country=ce.country
-join covid19_religions_pivot_final crpf 
-on crpf.country=ci.country
-join covid19_life_expectancy cle
-on ci.country=cle.country
-join covid19_temp_final ctf
-on ci.country=ctf.country and 
-ci.date=ctf.date
-join covid19_hours_rain_final chrf 
-on ci.country=chrf.country and 
-ci.date=chrf.date
-join covid19_wind_final cwf 
-on ci.country=cwf.country and 
-ci.date=cwf.date;
 
-       
--- pï¿½evodnï¿½kovï¿½ selecty texty na ï¿½ï¿½sla --
-
-create table covid19_temper_wind_convert as
+create table covid19_temp_wind_convert as
 select
   w.city,
   w.date,
@@ -230,14 +195,75 @@ on lt.iso3=c.iso3;
 create table covid19_temp_final as
 select
 	ctwc.date,
-	c.country,
+	cc.country,
 	round (avg (ctwc.temp),2) as avg_temp
 from covid19_temper_wind_convert ctwc 
-join countries c
-on c.capital_city=ctwc.city
+join covid19_countries cc 
+on cc.capital_city=ctwc.city
 where city is not null and ctwc.time between '09:00' and '18:00'
-group by ctwc.date, c.country;
+group by ctwc.date, cc.country;
 
+create table covid19_wind_final as
+select
+	ctwc.date,
+	cc.country,
+	max (ctwc.wind) as max_wind
+from covid19_temper_wind_convert ctwc
+join covid19_countries cc 
+on cc.capital_city=ctwc.city
+where ctwc.city is not null 
+group by ctwc.date, cc.country;
+
+create table t_Martin_Hans_projekt_SQL_final
+select 
+	ci.country,
+	ci.date,
+	ci.confirmed,
+	ci.weekend,
+	ci.period,
+	ci.tests_performed,
+	ci.population_density,
+	ci.median_age_2018, 
+	ce.gdp_per_capita,
+	ce.gini_coeficient,
+	ce.child_mortality,
+	crpf.Buddhism,
+	crpf.Christianity,
+	crpf.Folk_Religions,
+	crpf.Hinduism,
+	crpf.Islam,
+	crpf.Judaism,
+	crpf.Other_Religions,
+	crpf.Unaffiliated_Religions,
+	cle.life_exp_diff,
+	ctf.avg_temp,
+	chrf.hours_rain,
+	cwf.max_wind
+from covid19_info ci
+left join covid19_economies ce 
+on ci.country=ce.country
+left join covid19_religions_pivot_final crpf 
+on crpf.country=ci.country
+left join covid19_life_expectancy cle
+on ci.country=cle.country
+left join covid19_temp_final ctf
+on ci.country=ctf.country and 
+ci.date=ctf.date
+left join covid19_hours_rain_final chrf 
+on ci.country=chrf.country and 
+ci.date=chrf.date
+left join covid19_wind_final cwf 
+on ci.country=cwf.country and 
+ci.date=cwf.date
+group by ci.country, ci.date
+order by ci.date, ci.country;
+
+       
+-- pï¿½evodnï¿½kovï¿½ selecty texty na ï¿½ï¿½sla --
+
+--- nové --
+
+-- staré --
 create table covid19_wind_final as
 select
 	ctwc.date,
@@ -248,6 +274,18 @@ join countries c
 on c.capital_city=ctwc.city
 where ctwc.city is not null 
 group by ctwc.date, c.country;
+
+create table covid19_temp_final as
+select
+	ctwc.date,
+	c.country,
+	round (avg (ctwc.temp),2) as avg_temp
+from covid19_temper_wind_convert ctwc 
+join countries c 
+on c.capital_city=ctwc.city
+where city is not null and ctwc.time between '09:00' and '18:00'
+group by ctwc.date, c.country;
+
 
 CREATE TABLE covid19_hours_rain_conversion AS
 select 
@@ -431,3 +469,59 @@ select `date`, city, sum (hours_rain)
        from t_hours_rain thr 
        where city is not null
        group by date,city;
+       
+-- porovnání tabulek --
+      
+select count (distinct country)
+from covid19_info ci;
+
+select count (distinct country)
+from covid19_basic_differences cbd;  
+
+select count (distinct country)
+from covid19_tests ct;      
+    
+select count (distinct country)
+from lookup_table lt;
+
+select count (distinct country)
+from countries c;
+
+EXPLAIN
+select 
+	ci.country,
+	ci.date, 
+	ci.median_age_2018, 
+	ce.gdp_per_capita,
+	ce.gini_coeficient,
+	ce.child_mortality,
+	cle.life_exp_diff,
+	crpf.Buddhism,
+	crpf.Christianity,
+	crpf.Folk_Religions,
+	crpf.Hinduism,
+	crpf.Islam,
+	crpf.Judaism,
+	crpf.Other_Religions,
+	crpf.Unaffiliated_Religions,
+	ctf.avg_temp,
+	chrf.hours_rain,
+	cwf.max_wind
+from covid19_info ci
+join covid19_economies ce 
+on ci.country=ce.country
+join covid19_religions_pivot_final crpf 
+on crpf.country=ci.country
+join covid19_life_expectancy cle
+on ci.country=cle.country
+join covid19_temp_final ctf
+on ci.country=ctf.country and 
+ci.date=ctf.date
+join covid19_hours_rain_final chrf 
+on ci.country=chrf.country and 
+ci.date=chrf.date
+join covid19_wind_final cwf 
+on ci.country=cwf.country and 
+ci.date=cwf.date
+group by ci.country, ci.date
+order by ci.country,ci.`date`;
