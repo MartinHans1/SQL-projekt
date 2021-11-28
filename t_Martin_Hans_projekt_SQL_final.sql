@@ -1,5 +1,26 @@
 
----- final script --
+---- parciální tabulky --
+
+create table covid19_tests_final
+select 
+    ct.date,
+	lt.country,
+    ct.tests_performed  
+from lookup_table lt
+join covid19_tests ct 
+on lt.iso3=ct.ISO
+group by date, country
+order by date, country;
+
+create table covid19_countries
+select 
+   distinct (lt.country),
+    c.capital_city,
+    c.median_age_2018,
+    c.population_density 
+from lookup_table lt
+join countries c 
+on lt.iso3=c.iso3;
 
 create table covid19_info as
 select 
@@ -14,14 +35,14 @@ select
     when cbd.date >= '2020-09-22' then 2
     when cbd.date >= '2020-12-21' then 3
     else 0 end as period,
-  ct.tests_performed,
-  round(c.population_density,2) as population_density,
-  c.median_age_2018
+  ctf.tests_performed,
+  round(cc.population_density,2) as population_density,
+  cc.median_age_2018
 from covid19_basic_differences cbd
-join covid19_tests ct on
-cbd.date=ct.`date`
-and cbd.country=ct.country
-join countries c on cbd.country=c.country
+left join covid19_tests_final ctf on
+cbd.date=ctf.`date`
+and cbd.country=ctf.country
+left join covid19_countries cc on cbd.country=cc.country
 order by date, country;
 
 create table covid19_economies as
@@ -104,8 +125,7 @@ FROM (
     FROM life_expectancy le 
     WHERE year = 2015
     ) b
-    ON a.country = b.country
-;
+    ON a.country = b.country;
 
 create table covid19_temp_wind_convert as
 select
@@ -127,14 +147,6 @@ and w.date=w2.date
 and w.time=w2.time
 where w.city is not null 
 group by w.city,w.date, w.time;
-
-create table covid19_countries
-select 
-    lt.country,
-    c.capital_city
-from lookup_table lt
-join countries c 
-on lt.iso3=c.iso3;
 
 create table covid19_temp_final as
 select
@@ -176,6 +188,8 @@ from countries c
 join covid19_hours_rain_conversion chrc 
 on c.capital_city=chrc.city 
 group by chrc.date, c.country;
+
+---- finální skript --
 
 create table t_Martin_Hans_projekt_SQL_final
 select 
@@ -220,4 +234,4 @@ on ci.country=cwf.country and
 ci.date=cwf.date
 group by ci.country, ci.date
 order by ci.date, ci.country;
- 
+
