@@ -8,7 +8,7 @@ select
     ct.tests_performed  
 from lookup_table lt
 join covid19_tests ct 
-on lt.iso3=ct.ISO
+on lt.iso3 = ct.ISO
 group by date, country
 order by date, country;
 
@@ -20,7 +20,7 @@ select
     c.population_density 
 from lookup_table lt
 join countries c 
-on lt.iso3=c.iso3;
+on lt.iso3 = c.iso3;
 
 create table covid19_info as
 select 
@@ -40,9 +40,9 @@ select
   cc.median_age_2018
 from covid19_basic_differences cbd
 left join covid19_tests_final ctf on
-cbd.date=ctf.`date`
-and cbd.country=ctf.country
-left join covid19_countries cc on cbd.country=cc.country
+cbd.date = ctf.`date`
+and cbd.country = ctf.country
+left join covid19_countries cc on cbd.country = cc.country
 order by date, country;
 
 create table covid19_economies as
@@ -55,7 +55,7 @@ from economies e
 join (
 select country, GDP, population 
 from economies e2
-where year=2020 group by country) a on a.country=e.country
+where year = 2020 group by country) a on a.country = e.country
 group by e.country;
 
 create table covid19_religion_rel_share
@@ -142,9 +142,9 @@ join (select
   replace (temp,'°c',' ') as temp,
   substring (wind,1,2) as wind
 from weather) w2
-on w.city=w2.city 
-and w.date=w2.date
-and w.time=w2.time
+on w.city = w2.city 
+and w.date = w2.date
+and w.time = w2.time
 where w.city is not null 
 group by w.city,w.date, w.time;
 
@@ -155,7 +155,7 @@ select
 	round (avg (ctwc.temp),2) as avg_temp
 from covid19_temper_wind_convert ctwc 
 join covid19_countries cc 
-on cc.capital_city=ctwc.city
+on cc.capital_city = ctwc.city
 where city is not null and ctwc.time between '09:00' and '18:00'
 group by ctwc.date, cc.country;
 
@@ -166,7 +166,7 @@ select
 	max (ctwc.wind) as max_wind
 from covid19_temper_wind_convert ctwc
 join covid19_countries cc 
-on cc.capital_city=ctwc.city
+on cc.capital_city = ctwc.city
 where ctwc.city is not null 
 group by ctwc.date, cc.country;
 
@@ -186,7 +186,7 @@ select
     sum (chrc.hours_rain) as hours_rain
 from countries c 
 join covid19_hours_rain_conversion chrc 
-on c.capital_city=chrc.city 
+on c.capital_city = chrc.city 
 group by chrc.date, c.country;
 
 ---- finální skript --
@@ -218,20 +218,20 @@ select
 	cwf.max_wind
 from covid19_info ci
 left join covid19_economies ce 
-on ci.country=ce.country
+on ci.country = ce.country
 left join covid19_religions_pivot_final crpf 
-on crpf.country=ci.country
+on crpf.country = ci.country
 left join covid19_life_expectancy cle
-on ci.country=cle.country
+on ci.country = cle.country
 left join covid19_temp_final ctf
 on ci.country=ctf.country and 
-ci.date=ctf.date
+ci.date = ctf.date
 left join covid19_hours_rain_final chrf 
 on ci.country=chrf.country and 
-ci.date=chrf.date
+ci.date = chrf.date
 left join covid19_wind_final cwf 
-on ci.country=cwf.country and 
-ci.date=cwf.date
+on ci.country = cwf.country and 
+ci.date = cwf.date
 group by ci.country, ci.date
 order by ci.date, ci.country;
 
