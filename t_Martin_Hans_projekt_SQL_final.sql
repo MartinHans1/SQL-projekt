@@ -22,27 +22,42 @@ from lookup_table lt
 join countries c 
 on lt.iso3 = c.iso3;
 
+create table covid19_basic_differences_conversion
+select
+	date,
+	country,
+	confirmed,
+	DATE_FORMAT(date,'%m%d') AS month_day
+from covid19_basic_differences cbd;
+
+create table covid19_basic_differences_final
+select
+	date,
+	country,
+	confirmed,
+	cast(month_day as int) as month_day
+from covid19_basic_differences_conversion cbdf;
+
 create table covid19_info as
 select 
-  cbd.date,
-  cbd.country,
-  cbd.confirmed,
-  case when weekday(cbd.date) in (5,6) then 1 else 0 end as weekend,
+  cbdf.date,
+  cbdf.country,
+  cbdf.confirmed,
+  case when weekday(cbdf.date) in (5,6) then 1 else 0 end as weekend,
   case 
-    when cbd.date < '2020-03-20' then 3
-    when cbd.date >= '2020-03-20' then 0
-    when cbd.date >= '2020-06-21' then 1
-    when cbd.date >= '2020-09-22' then 2
-    when cbd.date >= '2020-12-21' then 3
+    when cbdf.month_day >= '1221' < '0320' then 3
+    when cbdf.month_day >= '0320' < '0621' then 0
+    when cbdf.month_day >= '0621' < '0922' then 1
+    when cbdf.month_day >= '0922' < '1221' then 2
     else 0 end as period,
   ctf.tests_performed,
   round(cc.population_density,2) as population_density,
   cc.median_age_2018
-from covid19_basic_differences cbd
+from covid19_basic_differences_final cbdf
 left join covid19_tests_final ctf on
-cbd.date = ctf.`date`
-and cbd.country = ctf.country
-left join covid19_countries cc on cbd.country = cc.country
+cbdf.date = ctf.`date`
+and cbdf.country = ctf.country
+left join covid19_countries cc on cbdf.country = cc.country
 order by date, country;
 
 create table covid19_economies as
@@ -139,7 +154,7 @@ join (select
   date, 
   city,
   time,
-  replace (temp,'°c',' ') as temp,
+  replace (temp,'°c','') as temp,
   substring (wind,1,2) as wind
 from weather) w2
 on w.city = w2.city 
@@ -204,14 +219,14 @@ select
 	ce.gdp_per_capita,
 	ce.gini_coeficient,
 	ce.child_mortality,
-	crpf.Buddhism,
-	crpf.Christianity,
-	crpf.Folk_Religions,
-	crpf.Hinduism,
-	crpf.Islam,
-	crpf.Judaism,
-	crpf.Other_Religions,
-	crpf.Unaffiliated_Religions,
+	crpf.Buddhism as buddhism,
+	crpf.Christianity as christianity,
+	crpf.Folk_Religions as folk_religions,
+	crpf.Hinduism as hinduism,
+	crpf.Islam as islam,
+	crpf.Judaism as judaism,
+	crpf.Other_Religions as other_religions,
+	crpf.Unaffiliated_Religions as unafilliated_religions,
 	cle.life_exp_diff_2015_1965,
 	ctf.avg_temp,
 	chrf.hours_rain,
@@ -224,10 +239,10 @@ on crpf.country = ci.country
 left join covid19_life_expectancy cle
 on ci.country = cle.country
 left join covid19_temp_final ctf
-on ci.country=ctf.country and 
+on ci.country = ctf.country and 
 ci.date = ctf.date
 left join covid19_hours_rain_final chrf 
-on ci.country=chrf.country and 
+on ci.country = chrf.country and 
 ci.date = chrf.date
 left join covid19_wind_final cwf 
 on ci.country = cwf.country and 
